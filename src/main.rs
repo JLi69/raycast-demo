@@ -3,11 +3,12 @@ use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::{Point, Rect};
 use std::time::Instant;
+use sdl2::image::LoadTexture;
 
 const MAP: [u8; 64] = [
     1, 1, 1, 1, 1, 1, 1, 1,
 	1, 0, 0, 0, 0, 0, 1, 1,
-	1, 0, 3, 0, 3, 0, 0, 1,
+	1, 0, 3, 0, 4, 0, 0, 1,
 	1, 0, 0, 0, 0, 0, 0, 1,
     1, 0, 3, 0, 3, 2, 0, 1,
 	1, 0, 1, 0, 0, 2, 0, 1,
@@ -155,8 +156,8 @@ fn raycast(startx: f64, starty: f64, angle: f64, max_dist: f64) -> Raycast {
     }
 }
 
-fn main() {
-    let ctx = sdl2::init().unwrap();
+fn main() -> Result<(), String> {
+	let ctx = sdl2::init().unwrap();
     let vid_subsystem = ctx.video().unwrap();
 
     let window = vid_subsystem
@@ -167,6 +168,14 @@ fn main() {
 
     let mut canvas = window.into_canvas().present_vsync().build().unwrap();
 
+	let texture_creator = canvas.texture_creator();
+	let texture = texture_creator.load_texture("assets/textures.png")
+		.map_err(|e| e.to_string())?;
+	
+	let mut texture_shaded = texture_creator.load_texture("assets/textures.png")
+		.map_err(|e| e.to_string())?;
+	texture_shaded.set_color_mod(255 / 8 * 5, 255 / 8 * 5, 255 / 8 * 5);
+
     let mut event_pump = ctx.event_pump().unwrap();
 
     let mut camx = 3.5;
@@ -175,7 +184,7 @@ fn main() {
     let mut dt = 0.0;
     let mut speed = 0.0;
     let mut rotation_speed = 0.0;
-    const FOV: f64 = 3.14159 / 3.0;
+    const FOV: f64 = 3.14159 / 12.0 * 5.0;
 
     'running: loop {
         let start = Instant::now();
@@ -249,25 +258,40 @@ fn main() {
         camy += cam_rotation.sin() * dt * speed;
 
         let mut angle = cam_rotation - FOV / 2.0;
-        for i in 0..800 {
-            angle += FOV * 1.0 / 800.0;
+        for i in 0..200 {
+            angle += FOV * 1.0 / 200.0;
             let ray = raycast(camx, camy, angle, 64.0);
 
             if ray.tile_type != 0 {
-                if ray.x.floor() == ray.x {
-                    canvas.set_draw_color(Color::RGB(0, 180, 0));
-                } else {
-                    canvas.set_draw_color(Color::RGB(0, 255, 0));
-                }
-
-                let d =
+				let d =
                     (ray.x - camx) * (cam_rotation).cos() + (ray.y - camy) * (cam_rotation).sin();
-                canvas
+				let pixel_pos;
+                if ray.x.floor() == ray.x {
+                    //canvas.set_draw_color(Color::RGB(0, 180, 0));
+					pixel_pos = (16.0 * ray.y.fract()) as i32 + 16 * (ray.tile_type as i32 - 1); 
+					canvas.copy(&texture,
+							Rect::new(pixel_pos, 0, 1, 16),
+							Rect::from_center(Point::new(i * 4, 300), 
+											  4,
+											  ((1.0 / d) * 900.0 / 2.0) as u32))
+					.unwrap();	
+				} else {
+                    //canvas.set_draw_color(Color::RGB(0, 255, 0)); 
+					pixel_pos = (16.0 * ray.x.fract()) as i32 + 16 * (ray.tile_type as i32 - 1); 
+					canvas.copy(&texture_shaded,
+							Rect::new(pixel_pos, 0, 1, 16),
+							Rect::from_center(Point::new(i * 4, 300), 
+											  4,
+											  ((1.0 / d) * 900.0 / 2.0) as u32))
+					.unwrap();	
+				}
+ 
+                /*canvas
                     .draw_line(
-                        Point::new(i, (-(1.0 / d) * 300.0 / 2.0 + 300.0) as i32),
-                        Point::new(i, ((1.0 / d) * 300.0 / 2.0 + 300.0) as i32),
+                        Point::new(i, (-(1.0 / d) * 500.0 / 2.0 + 300.0) as i32),
+                        Point::new(i, ((1.0 / d) * 500.0 / 2.0 + 300.0) as i32),
                     )
-                    .unwrap();
+                    .unwrap();*/	
             }
         }
 
@@ -303,4 +327,6 @@ fn main() {
 
         dt = start.elapsed().as_secs_f64();
     }
+
+	Ok(())
 }
