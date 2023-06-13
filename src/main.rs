@@ -221,10 +221,16 @@ fn main() -> Result<(), String> {
 		.map_err(|e| e.to_string())?;
 	let texture_pixels = bitmap::BitMap::from_png("assets/textures.png")
 		.map_err(|e| e.to_string())?;
-
 	let mut texture_shaded = texture_creator.load_texture("assets/textures.png")
 		.map_err(|e| e.to_string())?;
 	texture_shaded.set_color_mod(255 / 8 * 5, 255 / 8 * 5, 255 / 8 * 5);
+	let texture_shaded = texture_shaded; //Remove mutability
+
+	let sprite = texture_creator.load_texture("assets/sprite.png")
+		.map_err(|e| e.to_string())?;
+
+	let spritex = 1.5f64;
+	let spritey = 1.5f64;
 
 	let mut floor_texture = texture_creator.create_texture_streaming(PixelFormatEnum::BGRA8888, 200, 75)
 		.unwrap();
@@ -242,6 +248,7 @@ fn main() -> Result<(), String> {
     let mut rotation_speed = 0.0;
     const FOV: f64 = 3.14159 / 12.0 * 5.0;
 
+	let mut depthbuffer = [9999.0f64; 200];
     'running: loop {
         let start = Instant::now();
 
@@ -408,7 +415,6 @@ fn main() -> Result<(), String> {
 
 		canvas.copy(&ceil_texture, None, Rect::new(0, 0, 800, 300)).unwrap();
 
-
         let mut angle = cam_rotation - FOV / 2.0;
         for i in 0..200 {
             let ray = raycast(camx, camy, angle, 64.0);
@@ -416,6 +422,7 @@ fn main() -> Result<(), String> {
             if ray.tile_type != 0 {
 				let d =
                     (ray.x - camx) * (cam_rotation).cos() + (ray.y - camy) * (cam_rotation).sin();
+				depthbuffer[i as usize] = d;
 				let pixel_pos;
                 if ray.x.floor() == ray.x {
 					pixel_pos = (16.0 * ray.y.fract()) as i32 + 16 * (ray.tile_type as i32 - 1); 
@@ -440,6 +447,37 @@ fn main() -> Result<(), String> {
             angle += FOV * 1.0 / 200.0;
         }
 
+		//Draw the sprite
+		{
+			let sprite_trans_x = spritex - camx;
+			let sprite_trans_y = spritey - camy;
+			let sprite_rotated_y = sprite_trans_x * (-cam_rotation).cos()
+								   - sprite_trans_y * (-cam_rotation).sin();
+			let sprite_rotated_x = sprite_trans_x * (-cam_rotation).sin()
+								   + sprite_trans_y * (-cam_rotation).cos();	
+
+			let sprite_screen_size = (400.0 / sprite_rotated_y) as u32;
+			let sprite_screen_y = (300.0 / sprite_rotated_y + 300.0 - sprite_screen_size as f64 / 2.0) as i32;
+			let sprite_screen_x = ((sprite_rotated_x) 
+				 / ((FOV / 2.0).tan() * 2.0 * sprite_rotated_y) * 800.0) as i32 + 400;
+
+			/*canvas.copy(&sprite, None, Rect::from_center(Point::new(sprite_screen_x, sprite_screen_y),
+				sprite_screen_size, sprite_screen_size)).unwrap();*/
+
+			let startx  = (sprite_screen_x - sprite_screen_size as i32 / 2) / 4;
+			let endx  = (sprite_screen_x + sprite_screen_size as i32 / 2) / 4;
+			let mut pixel_x = 0.0f64;
+			for i in startx..endx {
+				if i >= 0 && (i as usize) < depthbuffer.len() &&
+				   depthbuffer[i as usize] > sprite_rotated_y {
+					canvas.copy(&sprite, Rect::new(pixel_x as i32, 0, 1, 64), 
+						Rect::from_center(Point::new(i * 4 + 2, sprite_screen_y),
+										  4, sprite_screen_size)).unwrap();	
+				}
+				pixel_x += 64.0 / sprite_screen_size as f64 * 4.0;	
+			}
+		}
+
         canvas.set_draw_color(Color::WHITE);
         for i in 0..MAP_HEIGHT {
             for j in 0..MAP_WIDTH {
@@ -450,6 +488,11 @@ fn main() -> Result<(), String> {
                 }
             }
         }
+
+        canvas.set_draw_color(Color::RED);
+		canvas
+			.draw_rect(Rect::new((spritex * 32.0) as i32 - 8, (spritey * 32.0) as i32 - 8, 16, 16))
+            .unwrap();
 
         let mut angle = cam_rotation - FOV / 2.0;
         for _ in 0..80 {
