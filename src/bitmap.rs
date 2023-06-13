@@ -1,5 +1,5 @@
-use std::fs::File;
 use std::cmp;
+use std::fs::File;
 
 pub struct BitMap {
     pub pixels: Vec<u8>,
@@ -46,8 +46,11 @@ impl BitMap {
             return;
         }
 
-        let ind = cmp::min((x * self.width as f64).floor() as usize * 3
-            + self.width * 3 * (y * self.height as f64).floor() as usize, self.pixels.len() - 3);
+        let ind = cmp::min(
+            (x * self.width as f64).floor() as usize * 3
+                + self.width * 3 * (y * self.height as f64).floor() as usize,
+            self.pixels.len() - 3,
+        );
 
         pixel_data[0] = self.pixels[ind];
         pixel_data[1] = self.pixels[ind + 1];
