@@ -494,38 +494,43 @@ fn main() -> Result<(), String> {
             let sprite_rotated_x =
                 sprite_trans_x * (-cam_rotation).sin() + sprite_trans_y * (-cam_rotation).cos();
 
-            let sprite_screen_size = (400.0 / sprite_rotated_y) as u32;
+			let sprite_sz = 400.0;
+
+            let sprite_screen_size = (sprite_sz / sprite_rotated_y) as u32;
             let sprite_screen_y =
                 (300.0 / sprite_rotated_y + 300.0 - sprite_screen_size as f64 / 2.0) as i32;
-            let sprite_screen_x =
-                ((sprite_rotated_x) / ((FOV / 2.0).tan() * 2.0 * sprite_rotated_y) * 800.0) as i32
-                    + 400;
+            let norm_x = (sprite_rotated_x / sprite_rotated_y).atan() / FOV + 0.5;
+			let sprite_screen_x = (norm_x * 800.0) as i32;
 
-            /*canvas.copy(&sprite, None, Rect::from_center(Point::new(sprite_screen_x, sprite_screen_y),
-            sprite_screen_size, sprite_screen_size)).unwrap();*/
+			let fov_range = 2.0 * (FOV / 2.0).tan() * sprite_rotated_y;
+			let sprite_start_x = ((sprite_rotated_x - sprite_sz / 600.0) / fov_range) + 0.5;
+			let sprite_end_x = ((sprite_rotated_x + sprite_sz / 600.0) / fov_range) + 0.5;
 
-            let startx = (sprite_screen_x - sprite_screen_size as i32 / 2) / 4;
-            let endx = (sprite_screen_x + sprite_screen_size as i32 / 2) / 4;
-            let mut pixel_x = 0.0f64;
-            for i in startx..endx {
-                if i >= 0
-                    && (i as usize) < depthbuffer.len()
-                    && depthbuffer[i as usize] > sprite_rotated_y
-                {
-                    canvas
-                        .copy(
-                            &sprite,
-                            Rect::new(pixel_x as i32, 0, 1, 64),
-                            Rect::from_center(
-                                Point::new(i * 4 + 2, sprite_screen_y),
-                                4,
-                                sprite_screen_size,
-                            ),
-                        )
-                        .unwrap();
-                }
-                pixel_x += 64.0 / sprite_screen_size as f64 * 4.0;
-            }
+			if ((sprite_start_x < 1.0 && sprite_end_x > 0.0) || (sprite_end_x > 1.0 && sprite_start_x < 0.0)) 
+				&& sprite_rotated_y > 0.0 {
+				let startx = (sprite_screen_x - sprite_screen_size as i32 / 2) / 4;
+            	let endx = (sprite_screen_x + sprite_screen_size as i32 / 2) / 4;
+            	let mut pixel_x = 0.0f64;
+            	for i in startx..endx {
+            	    if i >= 0
+            	        && (i as usize) < depthbuffer.len()
+            	        && depthbuffer[i as usize] > sprite_rotated_y
+            	    {
+            	        canvas
+            	            .copy(
+            	                &sprite,
+            	                Rect::new(pixel_x as i32, 0, 1, 64),
+            	                Rect::from_center(
+            	                    Point::new(i * 4 + 2, sprite_screen_y),
+            	                    4,
+            	                    sprite_screen_size,
+            	                ),
+            	            )
+            	            .unwrap();
+            	    }
+            	    pixel_x += 64.0 / sprite_screen_size as f64 * 4.0;
+            	}
+			}
         }
 
         canvas.set_draw_color(Color::WHITE);
